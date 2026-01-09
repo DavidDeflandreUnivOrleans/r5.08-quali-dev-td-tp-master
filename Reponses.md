@@ -121,3 +121,78 @@ Suite à l'exécution de MegaLinter, les types de problèmes suivants ont été 
     Complexité (PMD/Sonar) : Méthodes trop complexes (Complexité Cyclomatique élevée) avec trop de branchements conditionnels.
 
     Sécurité/Bonnes pratiques : Utilisation d'injections de dépendances par champ (Field Injection) au lieu de l'injection par constructeur.
+
+# Rapport TP 2 : Qualité et Tests (Product Registry)
+
+Ce module vise à nettoyer la dette technique identifiée et à sécuriser la logique métier via des tests automatisés.
+
+## Tâche 1 & 2 : Documentation et Correction Qualité
+
+### Procédure de correction
+1.  **Identification des manques de Javadoc :**
+    Utilisation de la commande pour localiser les marqueurs :
+    ```bash
+    grep -r "TODO: Complete Javadoc" .
+    ```
+    *Action réalisée :* Ajout des descriptions sur les classes et méthodes publiques, spécifiant les paramètres (`@param`) et les retours (`@return`).
+
+2.  **Correction automatique et manuelle (MegaLinter) :**
+    Lancement de l'analyseur sur la racine du workspace :
+    ```bash
+    pnpm mega-linter-runner -p $WORKSPACE_ROOT
+    ```
+    *Corrections appliquées :*
+    * Formatage du code (indentation, accolades).
+    * Suppression des imports inutilisés.
+    * Renommage des variables locales pour respecter le `camelCase`.
+
+## Tâche 3 : Tests Unitaires (Domain Kernel)
+
+### Objectif
+Validation de l'invariant de l'agrégat `Product`. Le domaine doit garantir qu'aucun produit ne peut exister dans un état invalide.
+
+### Scénarios couverts
+* **Création (Happy Path)** : Vérifie qu'un produit créé est bien à l'état `ACTIVE`.
+* **Validation** : Vérifie que la création échoue (Exception) si le nom, la description ou le SKU sont nuls.
+* **Cycle de vie (Update)** : Vérifie la mise à jour des propriétés.
+* **Cycle de vie (Delete)** : Vérifie que la suppression passe le produit à l'état `RETIRED`.
+* **Règles métier** : Interdiction de modifier ou supprimer un produit déjà `RETIRED`.
+
+## Tâche 4 : Tests d'Intégration (API Resource)
+
+### Objectif
+Valider la couche "Application" et "Web" (Resource). Ces tests vérifient que le contrôleur REST (Quarkus Resource) reçoit correctement les requêtes HTTP, valide les DTOs et appelle le service sous-jacent.
+
+### Scénarios couverts
+* `POST /api/products` : Création (201) et erreurs de validation (400).
+* `PATCH /api/products/{id}/name` : Renommage (204) et gestion des IDs inexistants (404) ou body invalides (400).
+* `DELETE /api/products/{id}` : Suppression logique.
+* `GET /api/products` : Liste paginée et filtrage.
+* `GET /api/products/{id}` : Récupération unitaire.
+
+*Note : L'utilisation de `@QuarkusTest` permet de charger le contexte CDI pour tester les injections réelles.*
+
+## Tâche 5 : Questions théoriques
+
+### 1. Différence entre Tests Unitaires et d'Intégration
+* **Test Unitaire** : Isole une petite unité de code (une classe, une méthode) du reste du système. Toutes les dépendances externes (BDD, autres services) sont bouchonnées (mockées). Ils sont très rapides et testent la logique pure.
+* **Test d'Intégration** : Vérifie que plusieurs composants fonctionnent correctement ensemble (ex: Resource + Service + Base de données). Ils sont plus lents mais garantissent que la chaîne de traitement est fonctionnelle.
+
+### 2. Pertinence de la couverture à 100%
+**Non**, viser systématiquement 100% n'est pas pertinent et peut être contre-productif.
+* **Rendement décroissant** : Tester des getters/setters ou des configurations triviales coûte du temps pour peu de valeur ajoutée.
+* **Fragilité** : Trop de tests couplés à l'implémentation rendent le refactoring difficile.
+* **Focus** : Il faut prioriser le "Core Domain" (règles métiers complexes) où le risque de bug est élevé et l'impact critique.
+
+### 3. Avantages de l'Architecture en Oignon (Onion Architecture) pour les tests
+L'architecture en oignon place le **Domaine au centre**, sans aucune dépendance vers l'extérieur (ni framework, ni BDD).
+* **Testabilité du Domaine** : Comme le domaine (ex: `Product`) ne dépend de rien, on peut écrire des tests unitaires purs (sans Mocks complexes, sans contexte Spring/Quarkus), comme réalisé dans la Tâche 3.
+* **Isolation** : L'infrastructure (BDD, Web) dépend du domaine, pas l'inverse. Cela permet de tester le métier même si la base de données n'est pas prête.
+
+### 4. Nomenclature des packages
+* **model** : Cœur du métier. Contient les Entités, Value Objects et les règles métiers (le "Quoi").
+* **application** : Orchestration. Contient les cas d'utilisation (Use Cases), appelle le domaine et utilise les ports (interfaces).
+* **infra** : Implémentation technique. Contient les adaptateurs concrets (Repository SQL, Client HTTP, Kafka).
+* **web** (ou api) : Point d'entrée. Contient les Contrôleurs REST (Resources) qui exposent l'application au monde extérieur.
+* **client** : Si présent, contient les proxies ou SDK pour appeler d'autres microservices.
+* **jpa** : Sous-dossier d'infra, spécifique à la persistance relationnelle (Entités Hibernate).
