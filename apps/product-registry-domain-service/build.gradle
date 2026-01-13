@@ -4,50 +4,59 @@ plugins {
     id 'jacoco'
 }
 
+tasks.withType(Copy).configureEach {
+    it.fileMode = null
+    it.dirMode = null
+}
+
+processResources {
+    fileMode = 0644
+}
+
 repositories {
     mavenCentral()
     mavenLocal()
 }
 
+// Définis la version de Quarkus explicitement si le BOM échoue
+def quarkusVersion = "3.15.1" // Vérifie ta version actuelle, ex: 3.7.x ou 3.15.x
+
 dependencies {
+    // On se repose uniquement sur le BOM local qui est maintenant corrigé
     implementation enforcedPlatform(project(":libs:bom-platform"))
     annotationProcessor enforcedPlatform(project(":libs:bom-platform"))
+    testImplementation enforcedPlatform(project(":libs:bom-platform"))
+
+    // Quarkus modules (sans version, le BOM s'en occupe)
     implementation 'io.quarkus:quarkus-arc'
     implementation 'io.quarkus:quarkus-rest-jackson'
     implementation 'io.quarkus:quarkus-hibernate-validator'
     implementation 'io.quarkus:quarkus-config-yaml'
-
-    implementation project(':libs:contracts:product-registry-contract')
-
-    // Platform
-    implementation "org.hibernate.validator:hibernate-validator"
-    compileOnly "org.projectlombok:lombok"
-
-    // JPA
     implementation 'io.quarkus:quarkus-hibernate-orm-panache'
     implementation 'io.quarkus:quarkus-jdbc-postgresql'
+    implementation 'io.quarkus:quarkus-smallrye-openapi'
 
     // Local Libs
+    implementation project(':libs:contracts:product-registry-contract')
     implementation project(":libs:kernel")
     implementation project(":libs:cqrs-support")
 
-    // MapStruct
+    // Annotations & Tools
+    implementation "org.hibernate.validator:hibernate-validator"
+    compileOnly "org.projectlombok:lombok"
     compileOnly "org.mapstruct:mapstruct"
-
-    // SmallRye OpenAPI
-    implementation 'io.quarkus:quarkus-smallrye-openapi'
-
-    // Annotation processors
     annotationProcessor "org.projectlombok:lombok"
     annotationProcessor "org.mapstruct:mapstruct-processor"
 
+    // Tests
     testImplementation 'io.quarkus:quarkus-junit5'
     testImplementation 'io.quarkus:quarkus-junit5-mockito'
     testImplementation 'io.quarkus:quarkus-jacoco'
-
+    testImplementation 'io.quarkus:quarkus-rest-assured'
+    
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation 'org.mockito:mockito-core'
-
+    testImplementation 'org.hamcrest:hamcrest'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
@@ -63,12 +72,27 @@ test {
     useJUnitPlatform()
     systemProperty "java.util.logging.manager", "org.jboss.logmanager.LogManager"
 }
+
 compileJava {
     options.encoding = 'UTF-8'
     options.compilerArgs << '-parameters'
-    dependsOn tasks.named('compileQuarkusGeneratedSourcesJava')
+    // S'assurer que les sources générées par Quarkus sont prêtes
+    if (tasks.findByName('compileQuarkusGeneratedSourcesJava')) {
+        dependsOn tasks.named('compileQuarkusGeneratedSourcesJava')
+    }
 }
 
 compileTestJava {
     options.encoding = 'UTF-8'
+}
+
+tasks.withType(Copy).configureEach {
+    // Empêche Gradle de tenter un chmod sur les fichiers copiés
+    fileMode = 0644
+    dirMode = 0755
+}
+
+// Spécifiquement pour le rapport de problèmes qui échoue aussi
+tasks.withType(GenerateModuleMetadata).configureEach {
+    enabled = false 
 }

@@ -7,15 +7,16 @@ javaPlatform {
 }
 
 dependencies {
+    // On utilise impérativement le groupe platform pour le BOM
     api platform("io.quarkus.platform:quarkus-bom:${quarkusPlatformVersion}")
 
     constraints {
-        api "org.hibernate.validator:hibernate-validator:${hibernateValidatorVersion}"
-        api "org.projectlombok:lombok:${lombokVersion}"
-        api "org.junit.jupiter:junit-jupiter:${junitJupiterVersion}"
-        api "org.mockito:mockito-core:${mockitoVersion}"
         api "org.mapstruct:mapstruct:${mapstructVersion}"
         api "org.mapstruct:mapstruct-processor:${mapstructVersion}"
-        api "org.glassfish.expressly:expressly:${expresslyVersion}"
+        api "org.projectlombok:lombok:${lombokVersion}"
+        api "org.hibernate.validator:hibernate-validator:${hibernateValidatorVersion}"
+        
+        // POUR REST-ASSURED : On ne force PAS de version ici.
+        // On laisse le BOM ci-dessus (quarkus-bom) injecter la version compatible.
     }
 }
